@@ -67,6 +67,7 @@ static TextLayer         *s_name_layer;
 static TextLayer         *s_taker_layer;
 static TextLayer         *s_dose_layer;
 static TextLayer         *s_time_layer;   // "Due: HH:MM [AM/PM]"
+static TextLayer         *s_day_layer;    // day of week, below the time
 #ifdef PBL_RECT
 static ActionBarLayer    *s_action_bar;
 static GBitmap           *s_icon_taken;
@@ -103,6 +104,7 @@ static char s_name_buf[36];
 static char s_taker_buf[28];
 static char s_dose_buf[28];
 static char s_time_buf[24];
+static char s_day_buf[16];  // enough space for long DOW, any language
 
 static void update_text(void) {
     MedEntry    *med      = med_list_get(s_med_index);
@@ -139,10 +141,30 @@ static void update_text(void) {
         s_time_buf[0] = '\0';
     }
 
+    // Day of week below the time, e.g. "Monday"
+    if (s_dose_time > 0) {
+        struct tm *t = localtime(&s_dose_time);
+
+        strftime(s_day_buf, sizeof(s_day_buf), "%a", t);  // TODO check if %A works in Pebble SDK
+        /*
+        // DEBUG Fallback, English only
+        snprintf(s_day_buf, sizeof(s_day_buf), "%s",
+                 t->tm_wday == 0 ? "Sunday" :
+                 t->tm_wday == 1 ? "Monday" :
+                 t->tm_wday == 2 ? "Tuesday" :
+                 t->tm_wday == 3 ? "Wednesday" :
+                 t->tm_wday == 4 ? "Thursday" :
+                 t->tm_wday == 5 ? "Friday" : "Saturday");
+        */
+    } else {
+        s_day_buf[0] = '\0';
+    }
+
     text_layer_set_text(s_name_layer,  s_name_buf);
     text_layer_set_text(s_taker_layer, s_taker_buf);
     text_layer_set_text(s_dose_layer,  s_dose_buf);
     text_layer_set_text(s_time_layer,  s_time_buf);
+    text_layer_set_text(s_day_layer,   s_day_buf);
 }
 
 // ---------------------------------------------------------------------------
@@ -464,26 +486,33 @@ static void window_load(Window *window) {
     text_layer_set_text_alignment(s_name_layer, GTextAlignmentCenter);
     layer_add_child(root, text_layer_get_layer(s_name_layer));
 
-    s_taker_layer = text_layer_create(GRect(text_x, text_y + 30, text_w, 24));
+    s_taker_layer = text_layer_create(GRect(text_x, text_y + 30, text_w, 22));
     text_layer_set_font(s_taker_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
     text_layer_set_text_alignment(s_taker_layer, GTextAlignmentCenter);
     layer_add_child(root, text_layer_get_layer(s_taker_layer));
 
-    s_dose_layer = text_layer_create(GRect(text_x, text_y + 54, text_w, 24));
+    s_dose_layer = text_layer_create(GRect(text_x, text_y + 52, text_w, 22));
     text_layer_set_font(s_dose_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
     text_layer_set_text_alignment(s_dose_layer, GTextAlignmentCenter);
     layer_add_child(root, text_layer_get_layer(s_dose_layer));
 
-    s_time_layer = text_layer_create(GRect(text_x, text_y + 80, text_w, 24));
+    s_time_layer = text_layer_create(GRect(text_x, text_y + 74, text_w, 22));
     text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
     text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
     layer_add_child(root, text_layer_get_layer(s_time_layer));
+
+    // Day of week printed below the time
+    s_day_layer = text_layer_create(GRect(text_x, text_y + 96, text_w, 20));
+    text_layer_set_font(s_day_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+    text_layer_set_text_alignment(s_day_layer, GTextAlignmentCenter);
+    layer_add_child(root, text_layer_get_layer(s_day_layer));
 
 #ifdef PBL_ROUND
     text_layer_enable_screen_text_flow_and_paging(s_name_layer,  5);
     text_layer_enable_screen_text_flow_and_paging(s_taker_layer, 5);
     text_layer_enable_screen_text_flow_and_paging(s_dose_layer,  5);
     text_layer_enable_screen_text_flow_and_paging(s_time_layer,  5);
+    text_layer_enable_screen_text_flow_and_paging(s_day_layer,   5);
 
     s_hints_layer = layer_create(bounds);
     layer_set_update_proc(s_hints_layer, hints_update_proc);
@@ -535,6 +564,7 @@ static void window_unload(Window *window) {
     text_layer_destroy(s_taker_layer);
     text_layer_destroy(s_dose_layer);
     text_layer_destroy(s_time_layer);
+    text_layer_destroy(s_day_layer);
 
     if (s_shield_path) { gpath_destroy(s_shield_path); s_shield_path = NULL; }
     if (s_drop_path)   { gpath_destroy(s_drop_path);   s_drop_path   = NULL; }
